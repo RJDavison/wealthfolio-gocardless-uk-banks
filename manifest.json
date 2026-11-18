@@ -1,0 +1,62 @@
+{
+  "id": "gocardless-uk-banks",
+  "name": "GoCardless UK Banks",
+  "version": "1.0.0",
+  "description": "Import transactions from any UK bank supported by GoCardless, with multiple bank connections",
+  "author": "Robert",
+  "main": "dist/addon.js",
+  "sdkVersion": "3.13.0",
+  "minWealthfolioVersion": "3.13.0",
+  "enabled": true,
+  "contributes": {
+    "routes": [{ "id": "gocardless-uk-banks" }],
+    "links": {
+      "sidebar": [
+        {
+          "id": "gocardless-uk-banks",
+          "route": "gocardless-uk-banks",
+          "label": "UK Banks",
+          "icon": "bank",
+          "order": 100
+        }
+      ]
+    }
+  },
+  "hostDependencies": {
+    "@tanstack/react-query": "^5.90.0",
+    "@wealthfolio/addon-sdk": "^3.13.0",
+    "@wealthfolio/ui": "^3.13.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "^1.70.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.7.0"
+  },
+  "network": {
+    "allowedHosts": ["bankaccountdata.gocardless.com"]
+  },
+  "permissions": [
+    {
+      "category": "accounts",
+      "functions": ["getAll", "create"],
+      "purpose": "List your Wealthfolio accounts so each connected bank account can be mapped to one, and create a matching cash account when you ask for it"
+    },
+    {
+      "category": "activities",
+      "functions": ["checkImport", "import"],
+      "purpose": "Validate and import transactions from all connected banks as deposits and withdrawals"
+    },
+    {
+      "category": "secrets",
+      "functions": ["get", "set", "delete", "use"],
+      "purpose": "Store your shared GoCardless credentials and access token in the OS keyring, and let Wealthfolio inject the bearer token into brokered requests"
+    },
+    {
+      "category": "network",
+      "functions": ["request"],
+      "purpose": "Call the GoCardless Bank Account Data API at bankaccountdata.gocardless.com to list institutions and read balances and transactions for every connected bank"
+    }
+  ],
+  "keywords": ["wealthfolio", "addon", "gocardless", "open-banking", "uk-banks"],
+  "license": "MIT"
+}
