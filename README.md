@@ -25,7 +25,7 @@ the major UK banks and many smaller ones.
 > locally with `HTTP 400` before it reaches GoCardless. You can change it later under
 > **Settings → Add-ons → GoCardless UK Banks → View permissions**.
 
-Install `wealthfolio-gocardless-uk-banks-addon-1.0.0.zip` from **Settings → Add-ons → Install from
+Install `wealthfolio-gocardless-uk-banks-addon-1.1.0.zip` from **Settings → Add-ons → Install from
 file**, then open **GoCardless UK Banks** in the sidebar.
 
 ## Setup
@@ -74,6 +74,26 @@ transactions, with a 7-day overlap to catch late-booked items.
 
 Transfers between your own accounts import as a withdrawal from one and a deposit into the other;
 use Wealthfolio's **Match transfers** to pair them.
+
+### Automatic sync on open
+
+Open **Settings → Automatic sync** and choose **Off**, **Every 6 hours**, **Every 12 hours**,
+**Once a day** or **Every 2 days**. The default is **Off**.
+
+When enabled, the add-on checks its schedule each time you open the **GoCardless UK Banks** page.
+If the oldest successful sync across your mapped accounts is older than the chosen interval, it
+runs one sync automatically and shows the result in the **Automatic sync on open** panel.
+
+Notes:
+
+- Nothing runs while Wealthfolio is closed, and only one sync runs at a time.
+- A newly added or never-synced bank makes the set due immediately.
+- If an automatic attempt fails, the next automatic attempt waits the same interval. Use the
+  manual **Sync all banks** button if you need to retry sooner.
+- Connections that are not `LN`, or accounts that have not been mapped to a Wealthfolio account,
+  are skipped.
+- Frequencies are deliberately conservative because UK banks limit GoCardless reads per account
+  per day.
 
 ## Renewing and disconnecting
 

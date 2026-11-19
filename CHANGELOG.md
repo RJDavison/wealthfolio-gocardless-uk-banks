@@ -5,6 +5,17 @@ All notable changes to the gocardless-uk-banks addon will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-19
+
+### Added
+
+- Optional automatic sync on opening the add-on. Choose **Off**, **Every 6 hours**,
+  **Every 12 hours**, **Once a day** or **Every 2 days** under **Settings → Automatic sync**.
+- Due calculation uses the oldest successful sync across mapped accounts, so a newly added or
+  never-synced bank is included. Failed automatic attempts are throttled for the configured
+  interval to protect the bank's daily request allowance.
+- The overview shows when an automatic sync ran and its result.
+
 ## [1.0.0] - 2026-11-18
 
 ### Added

@@ -1,6 +1,6 @@
 {
   "name": "wealthfolio-gocardless-uk-banks-addon",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Sync transactions from multiple UK banks via GoCardless Bank Account Data",
   "type": "module",
   "main": "dist/addon.js",

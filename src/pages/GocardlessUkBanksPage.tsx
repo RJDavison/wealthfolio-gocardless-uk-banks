@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AddonContext } from '@wealthfolio/addon-sdk';
 import {
@@ -10,7 +10,9 @@ import {
   CardTitle,
   Skeleton,
 } from '@wealthfolio/ui';
+import { autoSyncHoursLabel, autoSyncIsDue } from '../lib/autosync';
 import { DEFAULT_SYNC_DAYS } from '../lib/constants';
+import { formatDateTime } from '../lib/format';
 import {
   carryOverAccounts,
   describeCheck,
@@ -28,7 +30,13 @@ import {
   upsertConnection,
 } from '../lib/store';
 import { runSync } from '../lib/sync';
-import type { AddonSettings, ConnectionState, SyncRunResult } from '../types';
+import type {
+  AddonSettings,
+  AutoSyncHours,
+  ConnectionState,
+  SyncRunResult,
+} from '../types';
+import { AutoSyncPanel } from '../components/AutoSyncPanel';
 import { ConnectPanel } from '../components/ConnectPanel';
 import { ConnectionsPanel } from '../components/ConnectionsPanel';
 import { CredentialsPanel } from '../components/CredentialsPanel';
@@ -47,6 +55,9 @@ export function GocardlessUkBanksPage({ ctx }: { ctx: AddonContext }) {
   const [syncing, setSyncing] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<SyncRunResult | null>(null);
+  const [autoSyncMessage, setAutoSyncMessage] = useState<string | null>(null);
+  const syncLocked = useRef(false);
+  const autoSyncChecked = useRef(false);
 
   const settingsQuery = useQuery({
     queryKey: ['gocardless-uk', 'settings'],
@@ -137,16 +148,36 @@ export function GocardlessUkBanksPage({ ctx }: { ctx: AddonContext }) {
     ctx.api.toast.success('GoCardless credentials removed');
   }
 
-  async function handleSync(connectionId?: string, identity?: string) {
-    if (!connections.length) return;
+  async function recordAutoSyncAttempt() {
+    if (!settings) return;
+    try {
+      await persistSettings({
+        ...settings,
+        lastAutoSyncAttemptAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      ctx.api.logger.warn(`Could not record the automatic sync attempt: ${String(error)}`);
+    }
+  }
+
+  async function performSync(params: {
+    connectionId?: string;
+    identity?: string;
+    automatic?: boolean;
+  }) {
+    if (!connections.length || syncLocked.current) return;
+    syncLocked.current = true;
     setSyncing(true);
     setProgress(null);
     setLastRun(null);
+    if (params.automatic) {
+      await recordAutoSyncAttempt();
+    }
     try {
       const { connections: next, result } = await runSync(ctx, client, connections, {
         historyDays,
-        connectionIds: connectionId ? [connectionId] : undefined,
-        identities: identity ? [identity] : undefined,
+        connectionIds: params.connectionId ? [params.connectionId] : undefined,
+        identities: params.identity ? [params.identity] : undefined,
         onProgress: setProgress,
       });
       await persistConnections(next);
@@ -157,30 +188,84 @@ export function GocardlessUkBanksPage({ ctx }: { ctx: AddonContext }) {
       refreshWealthfolioAccounts();
 
       const failed = result.outcomes.filter((outcome) => outcome.error).length;
-      if (failed) {
+      const imported = result.outcomes.reduce((total, outcome) => total + outcome.imported, 0);
+      const skipped = result.outcomes.reduce((total, outcome) => total + outcome.skipped, 0);
+
+      if (params.automatic) {
+        const stamp = formatDateTime(new Date().toISOString());
+        setAutoSyncMessage(
+          failed
+            ? `${stamp} — finished with ${failed} account error(s). See Last sync.`
+            : `${stamp} — ${imported ? `imported ${imported} activities` : 'no new transactions'}.`,
+        );
+        ctx.api.toast[
+          failed ? 'warning' : skipped ? 'info' : imported ? 'success' : 'info'
+        ](
+          failed
+            ? `Automatic sync finished with ${failed} account error(s)`
+            : skipped
+              ? `Automatic sync imported ${imported} activities; ${skipped} row(s) rejected`
+              : imported
+                ? `Automatic sync imported ${imported} activities`
+                : 'Automatic sync: no new transactions',
+        );
+      } else if (failed) {
         ctx.api.toast.warning(`Sync finished with ${failed} account error(s)`);
+      } else if (skipped) {
+        ctx.api.toast.warning(
+          `Imported ${imported} activities; ${skipped} row(s) were rejected — see Last sync`,
+        );
       } else {
-        const imported = result.outcomes.reduce((total, outcome) => total + outcome.imported, 0);
-        const skipped = result.outcomes.reduce((total, outcome) => total + outcome.skipped, 0);
-        if (skipped) {
-          ctx.api.toast.warning(
-            `Imported ${imported} activities; ${skipped} row(s) were rejected — see Last sync`,
-          );
-        } else {
-          ctx.api.toast.success(
-            imported ? `Imported ${imported} activities` : 'No new transactions',
-          );
-        }
+        ctx.api.toast.success(imported ? `Imported ${imported} activities` : 'No new transactions');
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       ctx.api.logger.error(`Sync failed: ${message}`);
       ctx.api.toast.error(`Sync failed: ${message}`);
+      if (params.automatic) {
+        setAutoSyncMessage(
+          `${formatDateTime(new Date().toISOString())} — failed: ${message}. It will be retried the next time you open the add-on after the configured interval.`,
+        );
+      }
     } finally {
       setSyncing(false);
       setProgress(null);
+      syncLocked.current = false;
     }
   }
+
+  function handleSync(connectionId?: string, identity?: string) {
+    return performSync({ connectionId, identity });
+  }
+
+  async function handleAutoSyncChange(hours: AutoSyncHours) {
+    if (!settings) return;
+    await persistSettings({ ...settings, autoSyncHours: hours });
+    ctx.api.toast.success(
+      hours ? `Automatic sync set to ${autoSyncHoursLabel(hours).toLowerCase()}` : 'Automatic sync disabled',
+    );
+  }
+
+  useEffect(() => {
+    if (autoSyncChecked.current) return;
+    if (settingsQuery.isPending || credentialsQuery.isPending || connectionsQuery.isPending) return;
+    autoSyncChecked.current = true;
+
+    if (!settings || !hasCredentials) return;
+    if (!autoSyncIsDue({ settings, connections })) return;
+
+    ctx.api.logger.info(
+      `Automatic sync is due (${autoSyncHoursLabel(settings.autoSyncHours)})`,
+    );
+    void performSync({ automatic: true });
+  }, [
+    settings,
+    hasCredentials,
+    connections,
+    settingsQuery.isPending,
+    credentialsQuery.isPending,
+    connectionsQuery.isPending,
+  ]);
 
   function openConnect(institutionId?: string) {
     setPreselectedInstitutionId(institutionId);
@@ -238,6 +323,13 @@ export function GocardlessUkBanksPage({ ctx }: { ctx: AddonContext }) {
               settings={settings}
               hasCredentials={hasCredentials}
               onSaved={refreshAll}
+            />
+          ) : null}
+
+          {settings && view === 'settings' ? (
+            <AutoSyncPanel
+              settings={settings}
+              onChange={(hours) => void handleAutoSyncChange(hours)}
             />
           ) : null}
 
@@ -322,6 +414,12 @@ export function GocardlessUkBanksPage({ ctx }: { ctx: AddonContext }) {
             onRenew={(connection) => openConnect(connection.institutionId)}
             onRefreshAccounts={refreshWealthfolioAccounts}
           />
+
+          {autoSyncMessage ? (
+            <Callout tone="info" title="Automatic sync on open">
+              {autoSyncMessage}
+            </Callout>
+          ) : null}
 
           {syncing ? (
             <Callout tone="info" title="Syncing">

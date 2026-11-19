@@ -1,3 +1,5 @@
+import type { AutoSyncHours } from '../types';
+
 export const GC_API_BASE = 'https://bankaccountdata.gocardless.com/api/v2';
 
 export const GC_HOST = 'bankaccountdata.gocardless.com';
@@ -41,6 +43,23 @@ export const IMPORT_BATCH_SIZE = 250;
 
 /** How long fetched-but-not-imported bank data may be reused. */
 export const PENDING_BANK_DATA_TTL_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * UK banks allow only a handful of GoCardless reads per account per day, so
+ * automatic sync is deliberately conservative. `0` means manual only.
+ */
+export const AUTO_SYNC_OPTIONS = [
+  { hours: 0, label: 'Off — sync manually' },
+  { hours: 6, label: 'Every 6 hours' },
+  { hours: 12, label: 'Every 12 hours' },
+  { hours: 24, label: 'Once a day' },
+  { hours: 48, label: 'Every 2 days' },
+] as const satisfies ReadonlyArray<{
+  hours: AutoSyncHours;
+  label: string;
+}>;
+
+export const DEFAULT_AUTO_SYNC_HOURS: AutoSyncHours = 0;
 
 /** Consent window requested from the bank, in days. */
 export const ACCESS_VALID_FOR_DAYS = 90;

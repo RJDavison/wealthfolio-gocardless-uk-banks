@@ -33,10 +33,17 @@ export const REQUISITION_STATUS_LABELS: Record<RequisitionStatus, string> = {
   SU: 'Suspended',
 };
 
+/** Automatic-sync intervals offered in the settings dropdown. */
+export type AutoSyncHours = 0 | 6 | 12 | 24 | 48;
+
 /** Settings the user can edit without reconnecting. */
 export interface AddonSettings {
   /** Redirect URL registered in the GoCardless portal. */
   redirectUrl: string;
+  /** 0 disables automatic sync; otherwise sync when the page opens if overdue. */
+  autoSyncHours: AutoSyncHours;
+  /** When the last automatic attempt started, used to throttle failed retries. */
+  lastAutoSyncAttemptAt?: string;
 }
 
 /** One bank account mirrored into Wealthfolio. */

@@ -1,5 +1,7 @@
 import type { AddonContext } from '@wealthfolio/addon-sdk';
 import {
+  AUTO_SYNC_OPTIONS,
+  DEFAULT_AUTO_SYNC_HOURS,
   DEFAULT_REDIRECT_URL,
   PENDING_BANK_DATA_TTL_MS,
   SECRETS,
@@ -28,7 +30,17 @@ async function writeJson(ctx: AddonContext, key: string, value: unknown): Promis
 
 export async function loadSettings(ctx: AddonContext): Promise<AddonSettings> {
   const stored = await readJson<Partial<AddonSettings>>(ctx, STORAGE.settings);
-  return { redirectUrl: stored?.redirectUrl?.trim() || DEFAULT_REDIRECT_URL };
+  const autoSyncHours = AUTO_SYNC_OPTIONS.some(
+    (option) => option.hours === stored?.autoSyncHours,
+  )
+    ? (stored?.autoSyncHours as AddonSettings['autoSyncHours'])
+    : DEFAULT_AUTO_SYNC_HOURS;
+
+  return {
+    redirectUrl: stored?.redirectUrl?.trim() || DEFAULT_REDIRECT_URL,
+    autoSyncHours,
+    lastAutoSyncAttemptAt: stored?.lastAutoSyncAttemptAt,
+  };
 }
 
 export async function saveSettings(ctx: AddonContext, settings: AddonSettings): Promise<void> {

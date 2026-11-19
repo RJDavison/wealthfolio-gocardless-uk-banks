@@ -1,7 +1,7 @@
 {
   "id": "gocardless-uk-banks",
   "name": "GoCardless UK Banks",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Import transactions from any UK bank supported by GoCardless, with multiple bank connections",
   "author": "Robert",
   "main": "dist/addon.js",
